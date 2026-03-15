@@ -289,7 +289,10 @@ console.log(`  ${'Window'.padEnd(12)} last ${CONFIG.WINDOW} results per server`)
 console.log(`  ${'Output'.padEnd(12)} ${CONFIG.OUTPUT}`);
 console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop\n`);
 
-warmup().then(() => {
+warmup().catch(err => {
+  console.error(`\n${RESET}Warmup failed: ${err.message}`);
+  process.exit(1);
+}).then(() => {
   let domainIdx = 0;
   const startTime = Date.now();
   let lastStats   = startTime;
