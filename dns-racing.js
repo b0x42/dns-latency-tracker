@@ -39,9 +39,9 @@ const DOMAINS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RESET = '\x1b[0m', BOLD = '\x1b[1m';
+const GREEN = '\x1b[32m', CYAN = '\x1b[36m', YELLOW = '\x1b[33m', MAGENTA = '\x1b[35m', BLUE = '\x1b[34m';
 const CLEAR_LINE = '\x1b[2K';
 let tableLineCount = 0; // tracks how many lines the live table occupies so we can overwrite it
-const GREEN = '\x1b[32m', CYAN = '\x1b[36m', YELLOW = '\x1b[33m', MAGENTA = '\x1b[35m', BLUE = '\x1b[34m';
 
 // Colors cycled through for extra public resolvers
 const EXTRA_COLORS = [MAGENTA, BLUE, YELLOW];
@@ -116,7 +116,7 @@ function printStats(store, elapsed) {
 
   // Move cursor up to overwrite the previous table on all updates after the first
   if (tableLineCount > 0) process.stdout.write(`\x1b[${tableLineCount}A`);
-  for (const line of lines) process.stdout.write(`${CLEAR_LINE}${line}\n`);
+  for (const line of lines) process.stdout.write(`\r${CLEAR_LINE}${line}\n`);
   tableLineCount = lines.length;
 }
 
@@ -302,6 +302,7 @@ warmup().then(() => {
   function shutdown() {
     clearInterval(ticker);
     printStats(store, Date.now() - startTime);
+    tableLineCount = 0; // prevent further overwrites — breakdown and verdict print below the final table
     printDomainBreakdown();
     printVerdict(store);
     csv.end(() => { // wait for the write stream to flush before exiting
