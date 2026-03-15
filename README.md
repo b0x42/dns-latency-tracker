@@ -11,7 +11,7 @@ Ever wondered how your DNS server compares to cloud DNS? This tool fires paralle
 - Blocked domains (NXDOMAIN) counted separately, not as errors
 - Sub-1ms responses flagged as cache hits in a dedicated column
 - Per-domain breakdown and verdict on exit
-- CSV output for offline analysis
+- Auto CSV logging so you can analyse results with any tool you like
 
 ## Quick Start
 
