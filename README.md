@@ -7,9 +7,7 @@
 Ever wondered how your DNS server compares to cloud DNS? This tool fires parallel lookups at your custom server (AdGuard, Pi-hole, Unbound, etc.) and public resolvers simultaneously, showing live latency stats so you can see exactly how they stack up.
 
 - Compare your avg response time to one or more cloud DNS servers (Cloudflare, Google, Quad9, etc.)
-- Cache warmup before recording so cold-cache queries don't skew results
-- Blocked domains (NXDOMAIN) counted separately, not as errors
-- Sub-1ms responses flagged as cache hits in a dedicated column
+- Smart measurement — warms up caches before recording, separates blocked domains from errors, and flags cache hits so results are always meaningful
 - Per-domain breakdown and verdict on exit
 - Auto CSV logging so you can analyse results with any tool you like
 
