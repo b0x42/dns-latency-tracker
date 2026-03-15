@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DNS Latency Tracker — custom DNS vs public resolvers
+// DNS Racing — custom DNS vs public resolvers
 // Requires: Node.js >= 16.4
 
 require('dotenv').config();
