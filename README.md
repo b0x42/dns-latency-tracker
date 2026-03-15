@@ -4,7 +4,9 @@
 [![dotenv](https://img.shields.io/badge/config-dotenv-yellow.svg)](https://github.com/motdotla/dotenv)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Benchmarks your local AdGuard DNS server against Cloudflare (`1.1.1.1`) in real time. Fires parallel A-record lookups at both servers, prints live stats every 5 seconds, and saves every result to a timestamped CSV.
+If you run your own DNS server (AdGuard, Pi-hole, Unbound, etc.), you probably wonder whether it's actually faster than just using Cloudflare or Google. This tool answers that question — it fires parallel DNS lookups at your custom server and a public resolver simultaneously, and shows you live latency stats so you can see exactly how they compare.
+
+Fires parallel A-record lookups at both servers, prints live stats every 5 seconds, and saves every result to a timestamped CSV.
 
 - Live min / avg / p95 / max latency per server
 - Error classification: `ok`, `nxdomain`, `error`
@@ -39,9 +41,13 @@ Set values in your `.env` file (copy from `.env.example`):
 Live stats print to the terminal on the configured interval:
 
 ```
-── Stats after 10s ───────────────────────────────────────
-  AdGuard     ok=  250  err=  0  min=    1.2ms  avg=    3.4ms  p95=    8.1ms  max=   22.3ms
-  Cloudflare  ok=  250  err=  0  min=    8.5ms  avg=   12.1ms  p95=   18.4ms  max=   35.6ms
+Stats after 10s
+┌──────────────┬────────┬───────┬───────────┬───────────┬───────────┬───────────┐
+│       Server │     OK │   Err │       Min │       Avg │       p95 │       Max │
+├──────────────┼────────┼───────┼───────────┼───────────┼───────────┼───────────┤
+│      AdGuard │    250 │     0 │     1.2ms │     3.4ms │     8.1ms │    22.3ms │
+│   Cloudflare │    250 │     0 │     8.5ms │    12.1ms │    18.4ms │    35.6ms │
+└──────────────┴────────┴───────┴───────────┴───────────┴───────────┴───────────┘
 ```
 
 A CSV file named `dns_latency_<timestamp>.csv` is written to the current directory:

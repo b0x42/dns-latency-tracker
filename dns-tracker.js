@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 // DNS Latency Tracker — AdGuard vs. Cloudflare
-// Requires: Node.js >= 16.4  |  No npm install needed
+// Requires: Node.js >= 16.4
 
 require('dotenv').config();
-const dns        = require('node:dns/promises');
-const fs         = require('node:fs');
+const dns = require('node:dns/promises');
+const fs = require('node:fs');
 const { performance } = require('node:perf_hooks');
 
 // ── Config ────────────────────────────────────────────────────────────────────
+const rps = Number(process.env.RPS) || 25;
+if (rps <= 0) { console.error('RPS must be a positive number'); process.exit(1); }
+
 const CONFIG = {
-  CUSTOM_DNS:    process.env.CUSTOM_DNS  ?? '10.0.1.15',  // ← your AdGuard LXC IP
-  CLOUDFLARE:    process.env.CLOUDFLARE  ?? '1.1.1.1',
-  RPS:           Number(process.env.RPS)          || 25,   // requests per second per server
-  STATS_EVERY:   Number(process.env.STATS_EVERY)  || 5000, // ms between live stat prints
-  TIMEOUT:       Number(process.env.TIMEOUT)       || 5000, // DNS query timeout in ms
-  OUTPUT:        `dns_latency_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.csv`,
+  CUSTOM_DNS:  process.env.CUSTOM_DNS ?? '192.168.0.5', // ← your AdGuard LXC IP
+  CLOUDFLARE:  process.env.CLOUDFLARE ?? '1.1.1.1',
+  RPS:         rps,                                      // requests per second per server
+  STATS_EVERY: Number(process.env.STATS_EVERY) || 5000, // ms between live stat prints
+  TIMEOUT:     Number(process.env.TIMEOUT)     || 5000, // DNS query timeout in ms
+  OUTPUT:      `dns_latency_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.csv`,
+  WINDOW:      500, // rolling window size — keeps memory bounded for long runs
 };
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,7 +35,7 @@ const DOMAINS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const RESET = '\x1b[0m', BOLD = '\x1b[1m';
-const GREEN = '\x1b[32m', CYAN = '\x1b[36m', YELLOW = '\x1b[33m';
+const GREEN = '\x1b[32m', CYAN = '\x1b[36m';
 
 // Creates a DNS resolver pointed at a specific server IP
 function createResolver(ip) {
@@ -46,33 +50,73 @@ function percentile(sorted, p) {
   return sorted[Math.max(0, Math.ceil(sorted.length * p / 100) - 1)];
 }
 
+// Extracts stats from a rolling window of results for one server
+function computeStats(results) {
+  const ok     = results.filter(r => r.ok).map(r => r.ms);
+  const errors = results.length - ok.length;
+  if (!ok.length) return null;
+  const sorted = [...ok].sort((a, b) => a - b);
+  const avg    = ok.reduce((a, b) => a + b, 0) / ok.length;
+  return { ok: ok.length, errors, min: sorted[0], avg, p95: percentile(sorted, 95), max: sorted.at(-1) };
+}
+
 function printStats(store, elapsed) {
-  console.log(`\n${BOLD}── Stats after ${(elapsed / 1000).toFixed(0)}s ${'─'.repeat(35)}${RESET}`);
+  const fmtMs = v => `${v.toFixed(1)}ms`;
+  const cols  = { server: 12, ok: 6, err: 5, min: 9, avg: 9, p95: 9, max: 9 };
+  const hr    = (l, m, r) => l + Object.values(cols).map(w => '─'.repeat(w + 2)).join(m) + r;
+  const cell  = (v, w) => ` ${String(v).padStart(w)} `;
+
+  console.log(`\n${BOLD}Stats after ${(elapsed / 1000).toFixed(0)}s${RESET}`);
+  console.log(hr('┌', '┬', '┐'));
+  console.log(
+    '│' + cell('Server', cols.server) +
+    '│' + cell('OK',     cols.ok)     +
+    '│' + cell('Err',    cols.err)    +
+    '│' + cell('Min',    cols.min)    +
+    '│' + cell('Avg',    cols.avg)    +
+    '│' + cell('p95',    cols.p95)    +
+    '│' + cell('Max',    cols.max)    + '│'
+  );
+  console.log(hr('├', '┼', '┤'));
+
   for (const [ip, { label, color }] of Object.entries(SERVERS)) {
-    const ok     = store[ip].filter(r => r.ok).map(r => r.ms);
-    const errors = store[ip].length - ok.length;
-    if (!ok.length) { console.log(`  ${color}${label}${RESET}  no results yet`); continue; }
-    const sorted = [...ok].sort((a, b) => a - b);
-    const avg    = ok.reduce((a, b) => a + b, 0) / ok.length;
+    const s = computeStats(store[ip]);
+    if (!s) {
+      console.log('│' + ` ${color}${BOLD}${label.padEnd(cols.server)}${RESET}` + ' │' + ' (no results yet)');
+      continue;
+    }
     console.log(
-      `  ${color}${BOLD}${label}${RESET}` +
-      `  ok=${String(ok.length).padStart(5)}  err=${String(errors).padStart(3)}` +
-      `  min=${sorted[0].toFixed(1).padStart(7)}ms` +
-      `  avg=${avg.toFixed(1).padStart(7)}ms` +
-      `  p95=${percentile(sorted, 95).toFixed(1).padStart(7)}ms` +
-      `  max=${sorted.at(-1).toFixed(1).padStart(7)}ms`
+      '│' + ` ${color}${BOLD}${label.padEnd(cols.server)}${RESET} ` +
+      '│' + cell(s.ok,          cols.ok)  +
+      '│' + cell(s.errors,      cols.err) +
+      '│' + cell(fmtMs(s.min),  cols.min) +
+      '│' + cell(fmtMs(s.avg),  cols.avg) +
+      '│' + cell(fmtMs(s.p95),  cols.p95) +
+      '│' + cell(fmtMs(s.max),  cols.max) + '│'
     );
   }
+  console.log(hr('└', '┴', '┘'));
 }
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
-const SERVERS = {
-  [CONFIG.CUSTOM_DNS]: { label: 'AdGuard   ', color: CYAN,  resolver: createResolver(CONFIG.CUSTOM_DNS) },
-  [CONFIG.CLOUDFLARE]: { label: 'Cloudflare', color: GREEN, resolver: createResolver(CONFIG.CLOUDFLARE) },
-};
+let SERVERS;
+try {
+  SERVERS = {
+    [CONFIG.CUSTOM_DNS]: { label: 'AdGuard',    color: CYAN,  resolver: createResolver(CONFIG.CUSTOM_DNS) },
+    [CONFIG.CLOUDFLARE]: { label: 'Cloudflare', color: GREEN, resolver: createResolver(CONFIG.CLOUDFLARE) },
+  };
+} catch (err) {
+  console.error(`Invalid DNS server IP: ${err.message}`);
+  process.exit(1);
+}
 
-const store    = { [CONFIG.CUSTOM_DNS]: [], [CONFIG.CLOUDFLARE]: [] }; // in-memory results per server
-const csv      = fs.createWriteStream(CONFIG.OUTPUT); // stream stays open for the run's duration
+if (CONFIG.CUSTOM_DNS === CONFIG.CLOUDFLARE) {
+  console.error('CUSTOM_DNS and CLOUDFLARE must be different IPs');
+  process.exit(1);
+}
+
+const store = { [CONFIG.CUSTOM_DNS]: [], [CONFIG.CLOUDFLARE]: [] }; // rolling window per server
+const csv   = fs.createWriteStream(CONFIG.OUTPUT); // stream stays open for the run's duration
 csv.write('timestamp,server,domain,latency_ms,status\n'); // CSV header
 
 // ── Query ─────────────────────────────────────────────────────────────────────
@@ -89,12 +133,16 @@ async function query(ip, domain) {
   }
 
   const ms = performance.now() - t0; // wall-clock latency in milliseconds
-  store[ip].push({ ms, ok: status === 'ok' }); // accumulate for live stats
+
+  // keep the rolling window bounded
+  if (store[ip].length >= CONFIG.WINDOW) store[ip].shift();
+  store[ip].push({ ms, ok: status === 'ok' });
+
   csv.write(`${new Date().toISOString()},${ip},${domain},${ms.toFixed(2)},${status}\n`); // append row to CSV
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
-let domainIdx  = 0;
+let domainIdx = 0;
 const startTime = Date.now();
 let lastStats   = startTime;
 
@@ -102,10 +150,11 @@ console.log(`\n${BOLD}DNS Latency Tracker${RESET}`);
 console.log(`  AdGuard    ${CYAN}${CONFIG.CUSTOM_DNS}${RESET}`);
 console.log(`  Cloudflare ${GREEN}${CONFIG.CLOUDFLARE}${RESET}`);
 console.log(`  Rate       ${CONFIG.RPS} req/s per server  →  ${CONFIG.RPS * 2} total`);
+console.log(`  Window     last ${CONFIG.WINDOW} results per server`);
 console.log(`  Output     ${CONFIG.OUTPUT}`);
 console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop\n`);
 
-// setInterval fires every 40ms (= 25/s); both servers are queried in parallel per tick
+// fire both servers in parallel on each tick; interval derived from target RPS
 const ticker = setInterval(() => {
   const domain = DOMAINS[domainIdx++ % DOMAINS.length]; // cycle through domains round-robin
   query(CONFIG.CUSTOM_DNS, domain); // fire both queries without awaiting — intentionally parallel
@@ -116,15 +165,17 @@ const ticker = setInterval(() => {
     printStats(store, now - startTime);
     lastStats = now;
   }
-}, 1000 / CONFIG.RPS); // interval in ms derived from target RPS
+}, 1000 / CONFIG.RPS);
 
-// Ctrl+C handler: stop the ticker, print final stats, flush and close the CSV
-process.on('SIGINT', () => {
+// graceful shutdown on Ctrl+C or kill — print final stats and flush CSV
+function shutdown() {
   clearInterval(ticker);
   printStats(store, Date.now() - startTime);
   csv.end(() => { // wait for the write stream to flush before exiting
     console.log(`\n${GREEN}Results saved → ${CONFIG.OUTPUT}${RESET}\n`);
     process.exit(0);
   });
-});
+}
 
+process.on('SIGINT',  shutdown);
+process.on('SIGTERM', shutdown); // handle kill / docker stop / systemd stop
