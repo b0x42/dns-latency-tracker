@@ -302,7 +302,10 @@ warmup().then(() => {
   }, 1000 / CONFIG.RPS);
 
   // graceful shutdown on Ctrl+C or kill — print final stats, verdict, and flush CSV
+  let shuttingDown = false;
   function shutdown() {
+    if (shuttingDown) return;
+    shuttingDown = true;
     clearInterval(ticker);
     printStats(store, Date.now() - startTime);
     tableLineCount = 0; // prevent further overwrites — breakdown and verdict print below the final table
