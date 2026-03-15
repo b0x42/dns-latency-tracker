@@ -42,6 +42,7 @@ const RESET = '\x1b[0m', BOLD = '\x1b[1m';
 const GREEN = '\x1b[32m', CYAN = '\x1b[36m', YELLOW = '\x1b[33m', MAGENTA = '\x1b[35m', BLUE = '\x1b[34m';
 const CLEAR_LINE = '\x1b[2K';
 let tableLineCount = 0; // tracks how many lines the live table occupies so we can overwrite it
+let shuttingDown  = false;
 
 // Colors cycled through for extra public resolvers
 const EXTRA_COLORS = [MAGENTA, BLUE, YELLOW];
@@ -257,7 +258,7 @@ async function query(ip, domain, record = true) {
     domainStore[domain][ip].count += 1;
   }
 
-  csv.write(`${new Date().toISOString()},${ip},${domain},${ms.toFixed(2)},${status}\n`); // append row to CSV
+  if (!shuttingDown) csv.write(`${new Date().toISOString()},${ip},${domain},${ms.toFixed(2)},${status}\n`); // append row to CSV
 }
 
 // ── Warmup ────────────────────────────────────────────────────────────────────
@@ -302,7 +303,6 @@ warmup().then(() => {
   }, 1000 / CONFIG.RPS);
 
   // graceful shutdown on Ctrl+C or kill — print final stats, verdict, and flush CSV
-  let shuttingDown = false;
   function shutdown() {
     if (shuttingDown) return;
     shuttingDown = true;
