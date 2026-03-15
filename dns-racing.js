@@ -13,7 +13,7 @@ const { performance } = require('node:perf_hooks');
 const envNum = (key, def) => { const v = Number(process.env[key]); return isNaN(v) ? def : v; };
 
 const rps = envNum('RPS', 25);
-if (rps <= 0) { console.error('RPS must be a positive number'); process.exit(1); }
+if (rps <= 0) { console.error('Error: RPS must be a positive number. Check your .env file.'); process.exit(1); }
 
 const CONFIG = {
   CUSTOM_DNS:       process.env.CUSTOM_DNS       ?? '192.168.0.5', // ← your DNS server IP
@@ -214,12 +214,12 @@ try {
     SERVERS[ip] = { label, color: EXTRA_COLORS[i % EXTRA_COLORS.length], resolver: createResolver(ip) };
   });
 } catch (err) {
-  console.error(`Invalid DNS server IP: ${err.message}`);
+  console.error(`Error: Could not create DNS resolver — ${err.message}. Check CUSTOM_DNS, CLOUDFLARE, and EXTRA_DNS in your .env file.`);
   process.exit(1);
 }
 
 if (CONFIG.CUSTOM_DNS === CONFIG.CLOUDFLARE) {
-  console.error('CUSTOM_DNS and CLOUDFLARE must be different IPs');
+  console.error('Error: CUSTOM_DNS and CLOUDFLARE are the same IP. Set them to different servers in your .env file.');
   process.exit(1);
 }
 
@@ -290,7 +290,7 @@ console.log(`  ${'Output'.padEnd(12)} ${CONFIG.OUTPUT}`);
 console.log(`  Press ${BOLD}Ctrl+C${RESET} to stop\n`);
 
 warmup().catch(err => {
-  console.error(`\n${RESET}Warmup failed: ${err.message}`);
+  console.error(`\n${RESET}Error: Warmup failed — ${err.message}. Check that your DNS servers are reachable.`);
   process.exit(1);
 }).then(() => {
   let domainIdx = 0;
