@@ -1,8 +1,14 @@
-# DNS Racing
+<p align="center">
+  <img src="icon.jpg" width="256" alt="DNS Racing icon">
+  <br>
+  <strong><h1 align="center">DNS Racing</h1></strong>
+</p>
 
-[![Node.js](https://img.shields.io/badge/Node.js-16.4+-green.svg)](https://nodejs.org/)
-[![dotenv](https://img.shields.io/badge/config-dotenv-yellow.svg)](https://github.com/motdotla/dotenv)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-16.4+-green.svg" alt="Node.js"></a>
+  <a href="https://github.com/motdotla/dotenv"><img src="https://img.shields.io/badge/config-dotenv-yellow.svg" alt="dotenv"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+</p>
 
 Ever wondered how your DNS server compares to cloud DNS? This tool fires parallel lookups at your custom server (AdGuard, Pi-hole, Unbound, etc.) and public resolvers simultaneously, showing live latency stats so you can see exactly how they stack up.
 
