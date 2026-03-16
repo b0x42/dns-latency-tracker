@@ -121,7 +121,7 @@ function printStats(store, elapsed) {
     );
   }
   lines.push(hr('└', '┴', '┘'));
-  lines.push(`  Stop the race with ${BOLD}ESC${RESET} or ${BOLD}Ctrl+C${RESET}`);
+  lines.push(`  ${YELLOW}${BOLD}Stop the race with ESC or Ctrl+C${RESET}`);
 
   // Move cursor up to overwrite the previous table on all updates after the first
   if (tableLineCount > 0) process.stdout.write(`\x1b[${tableLineCount}A`);
