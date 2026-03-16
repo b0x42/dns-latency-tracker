@@ -46,10 +46,6 @@ Press `Ctrl+C` to stop and flush final stats, breakdown, verdict, and CSV.
 ## Output
 
 ```
-  Warming up cache (60 queries per server)... done
-```
-
-```
 Stats after 10s
 ┌────────────┬─────┬───────┬─────────┬─────┬───────┬───────┬───────┬────────┐
 │     Server │  OK │ Cache │ Blocked │ Err │   Min │   Avg │   p95 │    Max │
