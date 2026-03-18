@@ -2,7 +2,7 @@
 // DNS Racing — custom DNS vs public resolvers
 // Requires: Node.js >= 16.4
 
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const dns = require('node:dns/promises');
 const fs = require('node:fs');
 const { performance } = require('node:perf_hooks');
@@ -96,7 +96,7 @@ function printStats(store, elapsed) {
   lines.push(`${BOLD}Stats after ${(elapsed / 1000).toFixed(0)}s${RESET}`);
   lines.push(hr('┌', '┬', '┐'));
   lines.push(
-    '│' + cell('Server',  cols.server)  +
+    '│' + ` ${'Server'.padEnd(cols.server)} ` +
     '│' + cell('OK',      cols.ok)      +
     '│' + cell('Cache',   cols.cache)   +
     '│' + cell('Blocked', cols.blocked) +
@@ -186,39 +186,41 @@ function printVerdict(store) {
 // Prints per-domain avg latency for custom DNS vs the first public resolver,
 // sorted by the biggest win/loss for your custom server.
 function printDomainBreakdown() {
-  const [customIp, publicIp] = Object.keys(SERVERS);
+  const ips    = Object.keys(SERVERS);
+  const customIp = ips[0];
   const { label: customLabel, color: customColor } = SERVERS[customIp];
-  const { label: publicLabel, color: publicColor  } = SERVERS[publicIp];
 
   const rows = DOMAINS.map(domain => {
-    const c = domainStore[domain]?.[customIp];
-    const p = domainStore[domain]?.[publicIp];
-    if (!c || !p) return null;
-    const customAvg = c.sum / c.count;
-    const publicAvg = p.sum / p.count;
-    return { domain, customAvg, publicAvg, diff: publicAvg - customAvg };
-  }).filter(Boolean).sort((a, b) => b.diff - a.diff); // biggest custom-DNS wins first
+    const avgs = {};
+    for (const ip of ips) {
+      const d = domainStore[domain]?.[ip];
+      if (!d) return null;
+      avgs[ip] = d.sum / d.count;
+    }
+    return { domain, avgs, diff: Math.max(...ips.slice(1).map(ip => avgs[ip])) - avgs[customIp] };
+  }).filter(Boolean).sort((a, b) => b.diff - a.diff);
 
   if (!rows.length) return;
 
   const fmtMs  = v => `${v.toFixed(1)}ms`;
-  const dCol   = 18, msCol = 9, diffCol = 10;
-  const hr     = (l, m, r) => `${l}${'─'.repeat(dCol + 2)}${m}${'─'.repeat(msCol + 2)}${m}${'─'.repeat(msCol + 2)}${m}${'─'.repeat(diffCol + 2)}${r}`;
-  const cell   = (v, w) => ` ${String(v).padStart(w)} `;
+  const dCol = 18, msCol = 9, diffCol = 10;
+  const serverCols = ips.map(() => msCol);
+  const hr = (l, m, r) => l + '─'.repeat(dCol + 2) + ips.map(() => m + '─'.repeat(msCol + 2)).join('') + m + '─'.repeat(diffCol + 2) + r;
+  const cell = (v, w) => ` ${String(v).padStart(w)} `;
 
-  console.log(`\n${BOLD}Per-domain breakdown${RESET} (${customColor}${customLabel}${RESET} vs ${publicColor}${publicLabel}${RESET})`);
+  const title = ips.map(ip => `${SERVERS[ip].color}${SERVERS[ip].label}${RESET}`).join(' vs ');
+  console.log(`\n${BOLD}Per-domain breakdown${RESET} (${title})`);
   console.log(hr('┌', '┬', '┐'));
-  console.log(`│ ${'Domain'.padEnd(dCol)} │${cell(customLabel, msCol)}│${cell(publicLabel, msCol)}│${cell('Diff', diffCol)}│`);
+  console.log(`│ ${'Domain'.padEnd(dCol)} │` + ips.map(ip => cell(SERVERS[ip].label, msCol) + '│').join('') + cell('Diff', diffCol) + '│');
   console.log(hr('├', '┼', '┤'));
 
-  for (const { domain, customAvg, publicAvg, diff } of rows) {
-    const diffStr  = (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'ms';
-    const diffColor = diff > 0.5 ? customColor : diff < -0.5 ? publicColor : YELLOW;
+  for (const { domain, avgs, diff } of rows) {
+    const diffStr   = (diff >= 0 ? '+' : '') + diff.toFixed(1) + 'ms';
+    const diffColor = diff > 0.5 ? customColor : diff < -0.5 ? YELLOW : YELLOW;
     console.log(
-      `│ ${domain.padEnd(dCol)} ` +
-      `│${cell(fmtMs(customAvg), msCol)}` +
-      `│${cell(fmtMs(publicAvg), msCol)}` +
-      `│ ${diffColor}${diffStr.padStart(diffCol)}${RESET} │`
+      `│ ${domain.padEnd(dCol)} │` +
+      ips.map(ip => cell(fmtMs(avgs[ip]), msCol) + '│').join('') +
+      ` ${diffColor}${diffStr.padStart(diffCol)}${RESET} │`
     );
   }
   console.log(hr('└', '┴', '┘'));
